@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# data, models and outputs (too big for git)
+data/
+models/
+runs/
+out/
+*.onnx
+*.pt
