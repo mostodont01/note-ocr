@@ -117,13 +117,20 @@ def main(quiet: bool = False):
         say(f"{c:16s} {p:6.3f} {r:6.3f} {n:6d}")
 
     tot = match = pitch_ok = dur_ok = 0
+    kinds: dict[str, list[int]] = {}
     for seed, pages in sorted(by_seed.items()):
-        gt = tokens(random_score(seed, kind=a.kind))
+        gt_score = random_score(seed, kind=a.kind)
+        kind = {"Piano": "piano", "Drumset": "drums"}.get(gt_score.parts[0].name, "single")
+        gt = tokens(gt_score)
         rec_score = Score(parts=[p for _, s in sorted(pages, key=lambda t: t[0]) for p in s.parts])
         got = tokens(rec_score)
         sm = difflib.SequenceMatcher(a=gt, b=got, autojunk=False)
-        match += sum(b.size for b in sm.get_matching_blocks())
+        k = sum(b.size for b in sm.get_matching_blocks())
+        match += k
         tot += max(len(gt), len(got))
+        kinds.setdefault(kind, [0, 0])
+        kinds[kind][0] += k
+        kinds[kind][1] += max(len(gt), len(got))
         # pitch / duration separately
         sm_p = difflib.SequenceMatcher(a=[t[0] for t in gt], b=[t[0] for t in got], autojunk=False)  # noqa
         sm_d = difflib.SequenceMatcher(a=[t[1] for t in gt], b=[t[1] for t in got], autojunk=False)
@@ -131,11 +138,14 @@ def main(quiet: bool = False):
         dur_ok += sum(b.size for b in sm_d.get_matching_blocks())
     tps, fps, fns = sum(tp.values()), sum(fp.values()), sum(fn.values())
     result = {"det_f1": 2 * tps / max(2 * tps + fps + fns, 1), "events": tot,
-              "acc": match / tot if tot else None}
+              "acc": match / tot if tot else None,
+              "by_kind": {k: v[0] / v[1] for k, v in kinds.items() if v[1]}}
     if tot:
         say(f"\nend to end over {len(by_seed)} scores, {tot} events:")
         say(f"  events fully right (pitch + duration): {match / tot:.1%}")
         say(f"  pitch right: {pitch_ok / tot:.1%}   duration right: {dur_ok / tot:.1%}")
+        if len(kinds) > 1:
+            say("  by kind: " + ", ".join(f"{k} {v[0] / v[1]:.1%} ({v[1]} events)" for k, v in sorted(kinds.items())))
     say(f"  detection F1: {result['det_f1']:.3f}")
     return result
 
