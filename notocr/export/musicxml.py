@@ -9,6 +9,7 @@ from pathlib import Path
 
 from ..model import TYPE_NAMES, Clef, Event, Measure, Part, Score, key_alters
 
+_PART_ID = "P1"  # set while writing a part (instrument ids are per part)
 ACCIDENTAL_NAMES = {-2: "flat-flat", -1: "flat", 0: "natural", 1: "sharp", 2: "double-sharp"}
 DOCTYPE = (
     '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n'
@@ -72,6 +73,8 @@ def _write_note(parent, e: Event, idx: int, divisions: int, shown: list[str | No
                 _sub(n, "tie", type="stop")
             if head.tie_start:
                 _sub(n, "tie", type="start")
+            if percussion and head.instrument:
+                _sub(n, "instrument", id=f"{_PART_ID}-{head.instrument}")
         _sub(n, "voice", e.voice)
         if not (head is None and e.measure_rest):
             name = TYPE_NAMES.get(e.base)
@@ -185,7 +188,17 @@ def to_musicxml(score: Score) -> ET.ElementTree:
         _sub(sp, "part-name", part.name)
         if part.abbreviation:
             _sub(sp, "part-abbreviation", part.abbreviation)
-        if not part.percussion:
+        if part.percussion:
+            from ..percussion import KIT
+
+            for d in KIT:
+                si = _sub(sp, "score-instrument", id=f"P{i}-{d.id}")
+                _sub(si, "instrument-name", d.name)
+            for d in KIT:
+                mi = _sub(sp, "midi-instrument", id=f"P{i}-{d.id}")
+                _sub(mi, "midi-channel", 10)
+                _sub(mi, "midi-unpitched", d.midi)
+        else:
             si = _sub(sp, "score-instrument", id=f"P{i}-I1")
             _sub(si, "instrument-name", part.name)
             mi = _sub(sp, "midi-instrument", id=f"P{i}-I1")
@@ -195,6 +208,8 @@ def to_musicxml(score: Score) -> ET.ElementTree:
     divisions = _divisions(score.parts)
     for i, part in enumerate(score.parts, start=1):
         pel = _sub(root, "part", id=f"P{i}")
+        global _PART_ID
+        _PART_ID = f"P{i}"
         state = _State()
         for n, m in enumerate(part.measures, start=1):
             _write_measure(pel, m, n, part, divisions, state, first=(n == 1))

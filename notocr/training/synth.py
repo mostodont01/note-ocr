@@ -72,7 +72,55 @@ def degrade(img: np.ndarray, rng: random.Random) -> np.ndarray:
     return out
 
 
-def build(out_dir: str | Path, n_scores: int = 40, variants: int = 2, seed: int = 0, fonts=None):
+def warp(img: np.ndarray, boxes: list, rng: random.Random, spacing: float):
+    """Photo-like geometry: small rotation, perspective, page curvature. Boxes follow.
+
+    The warp is defined as a dst -> src map g; boxes use the first-order inverse
+    p_dst ~ p_src - (g(p_src) - p_src), fine for these small deformations."""
+    h, w = img.shape
+    ang = np.radians(rng.uniform(-1.2, 1.2))
+    amp = rng.uniform(0, 0.6) * spacing * rng.choice([-1, 1])  # page bend
+    phase = rng.uniform(0, np.pi)
+    px, py = rng.uniform(-0.012, 0.012), rng.uniform(-0.012, 0.012)  # perspective-ish
+
+    def g(x, y):
+        cx, cy = x - w / 2, y - h / 2
+        sx = cx * np.cos(ang) - cy * np.sin(ang)
+        sy = cx * np.sin(ang) + cy * np.cos(ang)
+        sx = sx * (1 + px * cy / h)
+        sy = sy * (1 + py * cx / w) + amp * np.sin(np.pi * x / w + phase)
+        return sx + w / 2, sy + h / 2
+
+    ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
+    mx, my = g(xs, ys)
+    out = cv2.remap(img, mx.astype(np.float32), my.astype(np.float32), cv2.INTER_LINEAR, borderValue=255)
+    new_boxes = []
+    for c, x0, y0, x1, y1 in boxes:
+        pts = np.array([(x0, y0), (x1, y0), (x0, y1), (x1, y1), ((x0 + x1) / 2, y0), ((x0 + x1) / 2, y1)])
+        gx, gy = g(pts[:, 0], pts[:, 1])
+        fx, fy = 2 * pts[:, 0] - gx, 2 * pts[:, 1] - gy
+        # keep the box size, move its centre (rotation would inflate thin boxes)
+        dx, dy = fx.mean() - pts[:, 0].mean(), fy.mean() - pts[:, 1].mean()
+        new_boxes.append([c, x0 + dx, y0 + dy, x1 + dx, y1 + dy])
+    return out, new_boxes
+
+
+def lighting(img: np.ndarray, rng: random.Random) -> np.ndarray:
+    """Uneven light / shadow like a phone photo."""
+    h, w = img.shape
+    ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
+    a = rng.uniform(0, 2 * np.pi)
+    grad = (np.cos(a) * xs / w + np.sin(a) * ys / h)
+    field = 1.0 - rng.uniform(0.1, 0.45) * (grad - grad.min()) / max(np.ptp(grad), 1e-6)
+    if rng.random() < 0.4:  # a soft shadow blob
+        cx, cy, r = rng.uniform(0, w), rng.uniform(0, h), rng.uniform(0.2, 0.6) * w
+        field *= 1.0 - 0.35 * np.exp(-((xs - cx) ** 2 + (ys - cy) ** 2) / (2 * r**2))
+    return np.clip(img.astype(np.float32) * field, 0, 255).astype(np.uint8)
+
+
+def build(out_dir: str | Path, n_scores: int = 40, variants: int = 2, seed: int = 0, fonts=None,
+          kind: str | None = None):
+    """kind: single / piano / drums, or None for a mix."""
     out_dir = Path(out_dir)
     rng = random.Random(seed)
     fonts = fonts or list(FONTS)
@@ -91,7 +139,7 @@ def build(out_dir: str | Path, n_scores: int = 40, variants: int = 2, seed: int 
         jobs = []
         for i in range(n_scores):
             s = seed * 100000 + fi * 1000 + i
-            xml = write_musicxml(random_score(s), work / f"s{s}.musicxml")
+            xml = write_musicxml(random_score(s, kind=kind), work / f"s{s}.musicxml")
             jobs.append((xml, work / f"s{s}.svg"))
         musescore.convert_batch(jobs, style=style)
         unknown_total = 0
@@ -113,6 +161,9 @@ def build(out_dir: str | Path, n_scores: int = 40, variants: int = 2, seed: int 
                     for lab, b in labelled
                     if lab in CLASS_INDEX
                 ]
+                if rng.random() < 0.35:  # photo-like
+                    img, boxes = warp(img, boxes, rng, NORM_SPACING)
+                    img = lighting(img, rng)
                 name = f"{svg.stem}_v{v}"
                 cv2.imwrite(str(out_dir / "images" / f"{name}.png"), img)
                 index.append({"image": f"images/{name}.png", "font": font, "boxes": boxes})

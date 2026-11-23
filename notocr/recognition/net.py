@@ -54,6 +54,8 @@ CLASSES = [
     "tie",
     "barline",
     "stem",
+    "notehead_x",
+    "clef_perc",
 ]
 CLASS_INDEX = {c: i for i, c in enumerate(CLASSES)}
 

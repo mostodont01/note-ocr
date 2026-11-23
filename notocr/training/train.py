@@ -119,6 +119,23 @@ class CropStream(IterableDataset):
             yield x, torch.from_numpy(heat), torch.from_numpy(size), torch.from_numpy(off), torch.from_numpy(mask)
 
 
+def load_partial(model, ckpt):
+    """Load a checkpoint even if the class list grew: matching tensors are copied, the
+    heatmap head keeps the rows of classes the checkpoint knows."""
+    old_classes = list(ckpt.get("classes", CLASSES))
+    state = model.state_dict()
+    for k, v in ckpt["model"].items():
+        if k not in state:
+            continue
+        if state[k].shape == v.shape:
+            state[k] = v
+        elif k.startswith("heat."):
+            for oi, c in enumerate(old_classes):
+                if c in CLASSES:
+                    state[k][CLASSES.index(c)] = v[oi]
+    model.load_state_dict(state)
+
+
 def compute_loss(model, batch):
     x, heat, size, off, mask = batch
     ph, ps, po = model(x)
@@ -145,7 +162,7 @@ def main():
     torch.set_num_threads(a.threads)
     model = Detector()
     if a.resume:
-        model.load_state_dict(torch.load(a.resume, map_location="cpu")["model"])
+        load_partial(model, torch.load(a.resume, map_location="cpu"))
     opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=a.lr, total_steps=a.steps, pct_start=0.05)
     loader = DataLoader(CropStream(a.data), batch_size=a.batch, num_workers=2, persistent_workers=True)

@@ -18,7 +18,7 @@ from pathlib import Path
 
 from ..export import musescore
 from ..export.musicxml import write_musicxml
-from ..model import ALTO, BASS, TENOR, TREBLE, Event, Measure, NoteHead, Part, Pitch, Score
+from ..model import ALTO, BASS, PERCUSSION, TENOR, TREBLE, Event, Measure, NoteHead, Part, Pitch, Score
 
 SVG_NS = "{http://www.w3.org/2000/svg}"
 NUM = re.compile(r"-?\d+(?:\.\d+)?(?:e-?\d+)?")
@@ -98,10 +98,24 @@ def parse_svg(path: str | Path) -> tuple[list[Element], tuple[float, float], flo
 # --------------------------------------------------------------------- calibration
 
 
-def _score(measures, clef=TREBLE, key=0, time=(4, 4), time_symbol=None) -> Score:
+def _score(measures, clef=TREBLE, key=0, time=(4, 4), time_symbol=None, percussion=False) -> Score:
     m0 = measures[0]
     m0.clefs, m0.key, m0.time, m0.time_symbol = {1: clef}, key, time, time_symbol
-    return Score(parts=[Part(measures=measures)])
+    return Score(parts=[Part(measures=measures, percussion=percussion)])
+
+
+def _drum_notes(drum_ids, base, n_measures=4):
+    from ..percussion import BY_ID
+
+    per = int(F(4) / base)
+    ms = []
+    for _ in range(n_measures):
+        evs = []
+        for i in range(per):
+            d = BY_ID[drum_ids[i % len(drum_ids)]]
+            evs.append(Event([NoteHead(d.display, notehead=d.notehead, instrument=d.id)], base))
+        ms.append(Measure(evs))
+    return ms
 
 
 def _notes(pitches, base, n_measures=4, rest_between=False, alter=0):
@@ -151,6 +165,10 @@ def calibration_scores() -> list[tuple[str, str, Score, str | None]]:
     for name, base in [("8th", F(1, 2)), ("16th", F(1, 4)), ("32nd", F(1, 8))]:
         out.append((f"flag_{name}_up", "Hook", _score(_notes(LOW, base, rest_between=True)), None))
         out.append((f"flag_{name}_down", "Hook", _score(_notes(HIGH, base, rest_between=True)), None))
+    for base in (F(1), F(2), F(4)):
+        out.append(("notehead_x", "Note", _score(_drum_notes(["hh", "ride", "crash", "ph"], base), clef=PERCUSSION,
+                                                 percussion=True), None))
+    out.append(("clef_perc", "Clef", _score(_drum_notes(["sn", "bd"], F(1)), clef=PERCUSSION, percussion=True), None))
     out.append(("clef_g", "Clef", _score(_notes(LOW, F(4)), clef=TREBLE), None))
     out.append(("clef_f", "Clef", _score(_notes([("C", 3)], F(4)), clef=BASS), None))
     out.append(("clef_c", "Clef", _score(_notes([("C", 4)], F(4)), clef=ALTO), None))

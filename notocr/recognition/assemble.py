@@ -18,6 +18,7 @@ import numpy as np
 from ..model import (
     ALTO,
     BASS,
+    PERCUSSION,
     TREBLE,
     Clef,
     Event,
@@ -31,10 +32,12 @@ from ..model import (
     key_alters,
     measure_length,
 )
+from ..percussion import drum_at
 from .detect import Symbol
 from .staff import PageLayout, Staff
 
-HEAD_BASE = {"notehead_black": F(1), "notehead_half": F(2), "notehead_whole": F(4)}
+HEAD_BASE = {"notehead_black": F(1), "notehead_half": F(2), "notehead_whole": F(4), "notehead_x": F(1)}
+BLACKISH = ("notehead_black", "notehead_x")
 REST_BASE = {
     "rest_whole": F(4),
     "rest_half": F(2),
@@ -45,7 +48,7 @@ REST_BASE = {
 }
 FLAG_LEVEL = {"8th": 1, "16th": 2, "32nd": 3}
 ACC_ALTER = {"sharp": 1, "flat": -1, "natural": 0, "double_sharp": 2, "double_flat": -2}
-CLEFS = {"clef_g": TREBLE, "clef_f": BASS, "clef_c": ALTO}
+CLEFS = {"clef_g": TREBLE, "clef_f": BASS, "clef_c": ALTO, "clef_perc": PERCUSSION}
 
 
 @dataclass
@@ -84,7 +87,15 @@ class StaffSymbols:
 
 def _assign_to_staves(symbols: list[Symbol], layout: PageLayout) -> list[StaffSymbols]:
     out = [StaffSymbols(s) for s in layout.staves]
-    for sym in symbols:
+    for sym in sorted(symbols, key=lambda s: s.cls.startswith("tuplet")):
+        if sym.cls == "barline":
+            spans = [ss for ss in out if sym.y0 <= ss.staff.top(sym.cx) + 0.5 * ss.staff.spacing()
+                     and sym.y1 >= ss.staff.bottom(sym.cx) - 0.5 * ss.staff.spacing()
+                     and ss.staff.x0 - ss.staff.spacing() <= sym.cx <= ss.staff.x1 + ss.staff.spacing()]
+            if spans:
+                for ss in spans:
+                    ss.syms.append(sym)
+                continue
         best, best_d = None, 1e9
         for ss in out:
             st = ss.staff
@@ -94,6 +105,18 @@ def _assign_to_staves(symbols: list[Symbol], layout: PageLayout) -> list[StaffSy
             d = 0.0 if top <= sym.cy <= bot else min(abs(sym.cy - top), abs(sym.cy - bot))
             if d < best_d:
                 best, best_d = ss, d
+        if sym.cls.startswith("tuplet") and best is not None:
+            # a tuplet number belongs to the notes it labels, which may be on the other
+            # staff (e.g. under the upper staff's beam, between the staves)
+            near = [
+                (abs(o.cy - sym.cy) + abs(o.cx - sym.cx), ss)
+                for ss in out
+                for o in ss.syms
+                if o.cls in ("stem", "notehead_black", "notehead_half", "notehead_x")
+            ]
+            if near:
+                best = min(near, key=lambda t: t[0])[1]
+                best_d = 0.0
         if best is not None and best_d < 7 * best.staff.spacing():
             best.syms.append(sym)
     return out
@@ -298,7 +321,7 @@ def _assemble_staff(ss: StaffSymbols, dark: np.ndarray, state: _State, first_sta
     # a clef sits on the staff and is tall (rejects e.g. an "ff" dynamic below it)
     clefs = [
         c for c in ss.of("clef_")
-        if st.top(c.cx) - 0.8 * d <= c.cy <= st.bottom(c.cx) + 0.8 * d and c.h >= 1.8 * d
+        if st.top(c.cx) - 0.8 * d <= c.cy <= st.bottom(c.cx) + 0.8 * d and c.h >= (1.0 if c.cls == "clef_perc" else 1.8) * d
     ]
     times = ss.of("time_")
     ties = ss.of("tie")
@@ -370,7 +393,7 @@ def _assemble_staff(ss: StaffSymbols, dark: np.ndarray, state: _State, first_sta
         for f in flags:
             if abs(f.x0 - g.stem.cx) < 0.6 * d and f.y0 - 0.5 * d <= tip <= f.y1 + 0.5 * d:
                 lv = max(lv, FLAG_LEVEL[f.cls.split("_")[1]])
-        if lv == 0 and g.heads[0].sym.cls == "notehead_black":
+        if lv == 0 and g.heads[0].sym.cls in BLACKISH:
             lv = _count_beams(dark, g.stem, g.up, d, st, line_dark)
         g.levels = lv
 
@@ -471,10 +494,16 @@ def _assemble_staff(ss: StaffSymbols, dark: np.ndarray, state: _State, first_sta
                 g = it
                 head_cls = g.heads[0].sym.cls
                 base = HEAD_BASE[head_cls]
-                if head_cls == "notehead_black":
+                if head_cls in BLACKISH:
                     base = F(1, 2**g.levels)
                 notes = []
                 for h in sorted(g.heads, key=lambda h: h.pos):
+                    if state.clef.sign == "percussion":
+                        drum = drum_at(h.pos, "x" if h.sym.cls == "notehead_x" else "normal")
+                        nh = NoteHead(drum.display, notehead=drum.notehead, instrument=drum.id, region=_region(h.sym))
+                        nh._head = h  # type: ignore[attr-defined]
+                        notes.append(nh)
+                        continue
                     natural = state.clef.pitch_at(h.pos)
                     kk = (natural.step, natural.octave)
                     if h.accidental is not None:
@@ -544,13 +573,18 @@ def _assemble_staff(ss: StaffSymbols, dark: np.ndarray, state: _State, first_sta
 
 
 def check_measures(part: Part) -> list[int]:
-    """Indexes of measures whose durations don't add up to the time signature."""
+    """Indexes of measures whose durations don't add up to the time signature
+    (checked per staff and voice)."""
     bad = []
     time = (4, 4)
     for i, m in enumerate(part.measures):
         time = m.time or time
-        total = sum((e.duration for e in m.events), F(0))
-        if total != measure_length(time) and not (i == 0 and total < measure_length(time)):
+        want = measure_length(time)
+        totals: dict[tuple[int, int], F] = {}
+        for e in m.events:
+            totals[(e.staff, e.voice)] = totals.get((e.staff, e.voice), F(0)) + e.duration
+        ok = all(t == want or (i == 0 and t < want) for t in totals.values())
+        if not ok:
             bad.append(i)
             if m.region:
                 m.region.confidence = 0.3
@@ -558,12 +592,52 @@ def check_measures(part: Part) -> list[int]:
 
 
 def assemble(symbols: list[Symbol], layout: PageLayout, dark: np.ndarray, state: _State | None = None) -> Part:
-    """Single-staff part: every staff on the page continues the same part.
+    """Symbols -> one part.
 
+    Systems of one staff continue a single-staff part; systems of two staves form a
+    grand staff (piano: staff 1 + 2). A percussion clef makes it a drum part.
     `dark`: ink darkness 0..1 (staff lines kept, detected symbols other than stems and
     barlines blanked out); used for stems and beams."""
-    state = state or _State()
-    part = Part()
-    for si, ss in enumerate(_assign_to_staves(symbols, layout)):
-        part.measures.extend(_assemble_staff(ss, dark, state, first_staff=(si == 0)))
+    per_staff = _assign_to_staves(symbols, layout)
+    by_staff = {id(ss.staff): ss for ss in per_staff}
+    sizes = [len(sy.staves) for sy in layout.systems] or [1]
+    n = max(set(sizes), key=sizes.count)
+    if n != 2:
+        state = state or _State()
+        part = Part()
+        for si, ss in enumerate(per_staff):
+            part.measures.extend(_assemble_staff(ss, dark, state, first_staff=(si == 0)))
+        part.percussion = state.clef.sign == "percussion"
+        if part.percussion:
+            part.name, part.abbreviation = "Drumset", "D. Set"
+        return part
+
+    # grand staff
+    upper, lower = _State(), _State(clef=BASS)
+    part = Part(name="Piano", abbreviation="Pno.", staves=2)
+    first = True
+    for sy in layout.systems:
+        if len(sy.staves) != 2:
+            continue
+        top = _assemble_staff(by_staff[id(sy.staves[0])], dark, upper, first_staff=first)
+        bot = _assemble_staff(by_staff[id(sy.staves[1])], dark, lower, first_staff=first)
+        lower.key, lower.time = upper.key, upper.time
+        for i in range(max(len(top), len(bot))):
+            mt = top[i] if i < len(top) else Measure()
+            mb = bot[i] if i < len(bot) else None
+            for e in mt.events:
+                e.staff = 1
+            if mb is None or not mb.events:
+                mb = mb or Measure()
+                mb.events = [Event([], measure_length(upper.time), measure_rest=True)]
+            for e in mb.events:
+                e.staff = 2
+            m = Measure(events=mt.events + mb.events, time=mt.time, time_symbol=mt.time_symbol, key=mt.key,
+                        region=mt.region)
+            m.clefs = {1: c for c in mt.clefs.values()} | {2: c for c in mb.clefs.values()}
+            if first and i == 0:
+                m.clefs.setdefault(1, upper.clef)
+                m.clefs.setdefault(2, BASS)
+            part.measures.append(m)
+        first = False
     return part

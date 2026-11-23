@@ -28,7 +28,7 @@ def tokens(score: Score) -> list[tuple]:
     for part in score.parts:
         for m in part.measures:
             for e in m.events:
-                pitches = tuple(sorted(n.pitch.midi for n in e.notes)) or ("rest",)
+                pitches = tuple(sorted((n.pitch.midi, n.notehead) for n in e.notes)) or ("rest",)
                 out.append((pitches, e.duration))
     return out
 
@@ -38,6 +38,7 @@ def main():
     ap.add_argument("data")
     ap.add_argument("--weights", default=None)
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--kind", default=None, help="score kind of the dataset (single for the old v1 sets)")
     a = ap.parse_args()
     root = Path(a.data)
     items = json.loads((root / "index.json").read_text())
@@ -83,14 +84,14 @@ def main():
 
     tot = match = pitch_ok = dur_ok = 0
     for seed, pages in sorted(by_seed.items()):
-        gt = tokens(random_score(seed))
+        gt = tokens(random_score(seed, kind=a.kind))
         rec_score = Score(parts=[p for _, s in sorted(pages, key=lambda t: t[0]) for p in s.parts])
         got = tokens(rec_score)
         sm = difflib.SequenceMatcher(a=gt, b=got, autojunk=False)
         match += sum(b.size for b in sm.get_matching_blocks())
         tot += max(len(gt), len(got))
         # pitch / duration separately
-        sm_p = difflib.SequenceMatcher(a=[t[0] for t in gt], b=[t[0] for t in got], autojunk=False)
+        sm_p = difflib.SequenceMatcher(a=[t[0] for t in gt], b=[t[0] for t in got], autojunk=False)  # noqa
         sm_d = difflib.SequenceMatcher(a=[t[1] for t in gt], b=[t[1] for t in got], autojunk=False)
         pitch_ok += sum(b.size for b in sm_p.get_matching_blocks())
         dur_ok += sum(b.size for b in sm_d.get_matching_blocks())

@@ -14,11 +14,11 @@ from .net import CLASSES, NORM_SPACING, Detector, decode
 
 # classes that cannot share a spot: keep only the best one where they overlap
 EXCLUSIVE_GROUPS = [
-    {"notehead_black", "notehead_half", "notehead_whole"},
+    {"notehead_black", "notehead_half", "notehead_whole", "notehead_x"},
     {c for c in CLASSES if c.startswith("rest_")},
     {"sharp", "flat", "natural", "double_sharp", "double_flat"},
     {c for c in CLASSES if c.startswith("flag_")},
-    {"clef_g", "clef_f", "clef_c"},
+    {"clef_g", "clef_f", "clef_c", "clef_perc"},
     {c for c in CLASSES if c.startswith("time_")},
 ]
 
@@ -76,7 +76,8 @@ class SymbolDetector:
         if threads:
             torch.set_num_threads(threads)
         ckpt = torch.load(weights, map_location="cpu")
-        self.model = Detector(len(ckpt.get("classes", CLASSES)))
+        self.classes = list(ckpt.get("classes", CLASSES))
+        self.model = Detector(len(self.classes))
         self.model.load_state_dict(ckpt["model"])
         self.model.eval()
 
@@ -98,7 +99,7 @@ class SymbolDetector:
         for cls, score, cx, cy, bw, bh in dets:
             out.append(
                 Symbol(
-                    CLASSES[cls],
+                    self.classes[cls],
                     score,
                     (cx - bw / 2) / scale,
                     (cy - bh / 2) / scale,

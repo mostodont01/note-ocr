@@ -12,6 +12,7 @@ dependencies = [
     "torch",
     "svgelements",
     "cairosvg",
+    "pymupdf>=2.1",
 ]
 
 [project.scripts]
