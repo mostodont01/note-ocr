@@ -66,6 +66,9 @@ def main(argv=None):
     rt = sub.add_parser("retrain", help="fine-tune the detector with your corrections")
     rt.add_argument("--steps", type=int, default=400)
     rt.set_defaults(func=lambda a: __import__("notocr.training.finetune", fromlist=["finetune"]).finetune(steps=a.steps))
+    ff = sub.add_parser("install-firefox", help="register the Firefox extension's helper")
+    ff.set_defaults(func=lambda a: [print("installed:", p) for p in __import__(
+        "notocr.native_host", fromlist=["install"]).install()])
     inst = sub.add_parser("install-desktop", help="add note-OCR to the app menu")
     inst.set_defaults(func=cmd_install_desktop)
     a = ap.parse_args(argv)

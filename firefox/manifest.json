@@ -1,0 +1,19 @@
+{
+  "manifest_version": 2,
+  "name": "note-OCR",
+  "version": "0.1.0",
+  "description": "Select sheet music on a web page and turn it into MuseScore / MusicXML with note-OCR.",
+  "browser_specific_settings": {
+    "gecko": { "id": "notocr@mostodont01", "strict_min_version": "115.0" }
+  },
+  "icons": { "48": "icons/notocr.svg", "96": "icons/notocr.svg" },
+  "permissions": ["activeTab", "nativeMessaging", "<all_urls>"],
+  "background": { "scripts": ["background.js"] },
+  "browser_action": {
+    "default_icon": "icons/notocr.svg",
+    "default_title": "Recognise sheet music on this page"
+  },
+  "commands": {
+    "_execute_browser_action": { "suggested_key": { "default": "Alt+Shift+M" } }
+  }
+}
