@@ -165,7 +165,7 @@ def main():
     if a.resume:
         load_partial(model, torch.load(a.resume, map_location="cpu"))
     opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-4)
-    sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=a.lr, total_steps=a.steps, pct_start=0.05)
+    sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=a.lr, total_steps=a.steps, pct_start=max(0.05, 3 / a.steps))
     loader = DataLoader(CropStream(a.data), batch_size=a.batch, num_workers=2, persistent_workers=True)
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
