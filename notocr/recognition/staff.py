@@ -252,6 +252,41 @@ def _fit_line(ink: np.ndarray, horiz: np.ndarray, y_est: float, thickness: float
     return StaffLine(coeffs=coeffs, thickness=thickness, x0=x0, x1=x1)
 
 
+def _banded_staves(ink: np.ndarray, thickness: float, distance: float, bands: int = 8) -> list[Staff]:
+    h, w = ink.shape
+    edges = np.linspace(0, w, bands + 1).astype(int)
+    frags = []  # per band: list of (line ys)
+    for a, b in zip(edges[:-1], edges[1:]):
+        cands, _ = _line_candidates(ink[:, a:b], thickness, distance)
+        frags.append([((a + b) / 2, [cands[i][0] for i in g]) for g in _group_staves(cands, distance)])
+    chains: list[list[tuple[float, list[float]]]] = []
+    for band in frags:
+        for x, ys in band:
+            for ch in chains:
+                if abs(ch[-1][1][0] - ys[0]) < 1.5 * distance and ch[-1][0] < x:
+                    ch.append((x, ys))
+                    break
+            else:
+                chains.append([(x, ys)])
+    out = []
+    for ch in chains:
+        if len(ch) < max(3, bands // 2):
+            continue
+        xs = np.array([c[0] for c in ch])
+        deg = 2 if len(ch) >= 4 else 1
+        x0 = int(max(0, xs.min() - w / bands / 2))
+        x1 = int(min(w - 1, xs.max() + w / bands / 2))
+        lines = []
+        for li in range(5):
+            ys = np.array([c[1][li] for c in ch])
+            coeffs = np.polyfit(xs, ys, deg)
+            if deg == 1:
+                coeffs = np.concatenate([[0.0], coeffs])
+            lines.append(StaffLine(coeffs=coeffs, thickness=thickness, x0=x0, x1=x1))
+        out.append(Staff(lines=lines))
+    return out
+
+
 def _connected(ink: np.ndarray, a: Staff, b: Staff, distance: float) -> bool:
     """True if a vertical line joins staff a (above) and staff b at the left edge."""
     x0 = max(a.x0, b.x0)
@@ -268,16 +303,27 @@ def _connected(ink: np.ndarray, a: Staff, b: Staff, distance: float) -> bool:
 def detect_staves(ink: np.ndarray) -> PageLayout:
     thickness, distance = run_length_stats(ink)
     cands, horiz = _line_candidates(ink, thickness, distance)
-    groups = _group_staves(cands, distance)
+    groups = [[cands[i] for i in g] for g in _group_staves(cands, distance)]
+    groups.sort(key=lambda g: g[0][0])
     layout = PageLayout(shape=ink.shape, line_thickness=thickness, line_distance=distance)
     for g in groups:
         lines = []
-        for idx in g:
-            line = _fit_line(ink, horiz, cands[idx][0], cands[idx][1], distance)
+        for cand in g:
+            line = _fit_line(ink, horiz, cand[0], cand[1], distance)
             if line is not None:
                 lines.append(line)
         if len(lines) == 5:
             layout.staves.append(Staff(lines=lines, index=len(layout.staves)))
+
+    # tilted / bent staves (photos) smear in the full-width profile: find them in narrow
+    # vertical bands and chain the pieces
+    for st in _banded_staves(ink, thickness, distance):
+        mid = (st.x0 + st.x1) / 2
+        if all(abs(st.top(mid) - o.top(mid)) > 2 * distance for o in layout.staves):
+            layout.staves.append(st)
+    layout.staves.sort(key=lambda st: st.top())
+    for i, st in enumerate(layout.staves):
+        st.index = i
 
     # systems
     current: list[Staff] = []

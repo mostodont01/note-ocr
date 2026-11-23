@@ -23,7 +23,7 @@ from ..pipeline import _BEAM_MASK_SKIP, merge_pages
 from ..recognition.assemble import _State, assemble, check_measures
 from ..recognition.detect import Symbol, SymbolDetector
 from ..recognition.classes import NORM_SPACING
-from ..recognition.staff import PageLayout, detect_staves, estimate_skew, rotate
+from ..recognition.staff import PageLayout, detect_staves
 
 # default symbol sizes in staff spaces (w, h), used when adding a symbol by hand
 DEFAULT_SIZE = {
@@ -108,12 +108,11 @@ class Session:
             raw = [(load_gray(path), [])]
         saved = self._load_project() if use_saved else None
         for i, (gray, glyphs) in enumerate(raw):
-            ink = binarize(gray)
             if not glyphs:
-                deg = estimate_skew(ink)
-                if abs(deg) >= 0.1:
-                    gray = rotate(gray, deg)
-                    ink = binarize(gray)
+                from ..photo import prepare
+
+                gray = prepare(gray)  # page detection, deskew, dewarp (each only if needed)
+            ink = binarize(gray)
             layout = detect_staves(ink)
             spacing = float(np.median([s.spacing() for s in layout.staves])) if layout.staves else 10.0
             page = Page(gray, layout, [], spacing, glyphs)

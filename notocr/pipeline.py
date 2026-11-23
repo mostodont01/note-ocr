@@ -11,7 +11,7 @@ from .ingest import binarize, darkness, load_gray
 from .model import Score
 from .recognition.assemble import assemble, check_measures
 from .recognition.detect import Symbol, SymbolDetector
-from .recognition.staff import PageLayout, detect_staves, estimate_skew, rotate
+from .recognition.staff import PageLayout, detect_staves
 
 from .paths import active_model
 
@@ -38,12 +38,11 @@ class Recognizer:
     def page(self, gray: np.ndarray, deskew: bool = True, glyphs=None, state=None) -> PageResult:
         """Recognise one page. `glyphs`: SMuFL glyphs from a vector PDF (fast path);
         `state`: clef / key / time carried over from the previous page."""
-        ink = binarize(gray)
         if deskew and not glyphs:
-            deg = estimate_skew(ink)
-            if abs(deg) >= 0.1:
-                gray = rotate(gray, deg)
-                ink = binarize(gray)
+            from .photo import prepare
+
+            gray = prepare(gray)  # page detection, deskew, dewarp (each only if needed)
+        ink = binarize(gray)
         layout = detect_staves(ink)
         if not layout.staves:
             return PageResult(gray, layout, [], Score(parts=[]), [])
