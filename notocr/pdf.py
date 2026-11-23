@@ -26,7 +26,7 @@ TARGET_SPACING = 12.0  # px between staff lines in the rendered page
 # SMuFL code point -> detector class
 SMUFL = {
     0xE0A4: "notehead_black", 0xE0A3: "notehead_half", 0xE0A2: "notehead_whole", 0xE0A9: "notehead_x",
-    0xE0A8: "notehead_x", 0xE0A7: "notehead_x",
+    0xE0A8: "notehead_x_half", 0xE0A7: "notehead_x_whole",
     0xE4E3: "rest_whole", 0xE4E4: "rest_half", 0xE4E5: "rest_quarter", 0xE4E6: "rest_8th",
     0xE4E7: "rest_16th", 0xE4E8: "rest_32nd",
     0xE050: "clef_g", 0xE07A: "clef_g", 0xE062: "clef_f", 0xE07C: "clef_f", 0xE05C: "clef_c", 0xE07B: "clef_c",
@@ -40,7 +40,7 @@ SMUFL = {
     0xE883: "tuplet_3",
 }
 # classes whose glyph we may add when the detector missed it (box from same-class detections)
-ADDABLE = {"notehead_black", "notehead_half", "notehead_whole", "notehead_x", "sharp", "flat", "natural",
+ADDABLE = {"notehead_black", "notehead_half", "notehead_whole", "notehead_x", "notehead_x_half", "notehead_x_whole", "sharp", "flat", "natural",
            "dot", "rest_quarter", "rest_8th", "rest_16th", "rest_32nd"}
 
 

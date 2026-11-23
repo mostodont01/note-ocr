@@ -184,6 +184,8 @@ def relabel(out_dir: str | Path):
         font = it["font"]
         work = out_dir / "work" / font.replace(" ", "_")
         if font not in tables:
+            if not (work / "table.json").exists():  # labels changed: calibrate again
+                save_table(calibrate(work / "cal", work / "style.mss"), work / "table.json")
             tables[font] = load_table(work / "table.json")
         stem = Path(it["image"]).stem.rsplit("_v", 1)[0]
         elements, (vw, vh), space = parse_svg(work / f"{stem}.svg")

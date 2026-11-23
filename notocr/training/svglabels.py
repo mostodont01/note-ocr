@@ -167,8 +167,8 @@ def calibration_scores() -> list[tuple[str, str, Score, str | None]]:
     for name, base in [("8th", F(1, 2)), ("16th", F(1, 4)), ("32nd", F(1, 8))]:
         out.append((f"flag_{name}_up", "Hook", _score(_notes(LOW, base, rest_between=True)), None))
         out.append((f"flag_{name}_down", "Hook", _score(_notes(HIGH, base, rest_between=True)), None))
-    for base in (F(1), F(2), F(4)):
-        out.append(("notehead_x", "Note", _score(_drum_notes(["hh", "ride", "crash", "ph"], base), clef=PERCUSSION,
+    for base, lab in ((F(1), "notehead_x"), (F(2), "notehead_x_half"), (F(4), "notehead_x_whole")):
+        out.append((lab, "Note", _score(_drum_notes(["hh", "ride", "crash", "ph"], base), clef=PERCUSSION,
                                                  percussion=True), None))
     for dyn in ("pp", "p", "mp", "mf", "f", "ff", "sf", "fp"):
         ms = _notes(LOW + HIGH, F(1))

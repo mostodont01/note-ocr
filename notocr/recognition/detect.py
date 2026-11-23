@@ -12,7 +12,7 @@ from .classes import CLASSES, NORM_SPACING, STRIDE
 
 # classes that cannot share a spot: keep only the best one where they overlap
 EXCLUSIVE_GROUPS = [
-    {"notehead_black", "notehead_half", "notehead_whole", "notehead_x"},
+    {"notehead_black", "notehead_half", "notehead_whole", "notehead_x", "notehead_x_half", "notehead_x_whole"},
     {c for c in CLASSES if c.startswith("rest_")},
     {"sharp", "flat", "natural", "double_sharp", "double_flat"},
     {c for c in CLASSES if c.startswith("flag_")},

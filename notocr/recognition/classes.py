@@ -61,5 +61,8 @@ CLASSES = [
     "marcato",
     "fermata",
     "slur",
+    # v3b
+    "notehead_x_half",
+    "notehead_x_whole",
 ]
 CLASS_INDEX = {c: i for i, c in enumerate(CLASSES)}

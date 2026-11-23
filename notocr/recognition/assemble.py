@@ -36,7 +36,9 @@ from ..percussion import drum_at
 from .detect import Symbol
 from .staff import PageLayout, Staff
 
-HEAD_BASE = {"notehead_black": F(1), "notehead_half": F(2), "notehead_whole": F(4), "notehead_x": F(1)}
+HEAD_BASE = {"notehead_black": F(1), "notehead_half": F(2), "notehead_whole": F(4), "notehead_x": F(1),
+             "notehead_x_half": F(2), "notehead_x_whole": F(4)}
+WHOLE = ("notehead_whole", "notehead_x_whole")  # no stem
 BLACKISH = ("notehead_black", "notehead_x")
 REST_BASE = {
     "rest_whole": F(4),
@@ -112,7 +114,7 @@ def _assign_to_staves(symbols: list[Symbol], layout: PageLayout) -> list[StaffSy
                 (abs(o.cy - sym.cy) + abs(o.cx - sym.cx), ss)
                 for ss in out
                 for o in ss.syms
-                if o.cls in ("stem", "notehead_black", "notehead_half", "notehead_x")
+                if o.cls == "stem" or o.cls.startswith("notehead")
             ]
             if near:
                 best = min(near, key=lambda t: t[0])[1]
@@ -363,7 +365,7 @@ def _assemble_staff(ss: StaffSymbols, dark: np.ndarray, state: _State, first_sta
     by_stem: dict[int, Group] = {}
     for h in heads:
         stem = None
-        if h.sym.cls != "notehead_whole":
+        if h.sym.cls not in WHOLE:
             stem = _stem_for(h.sym, stems, d) or _find_stem_classic(ink, h.sym, d)
             if stem is not None and stem.score < 0.31:
                 stems.append(stem)  # classic stem, shared by the rest of its chord
@@ -507,7 +509,7 @@ def _assemble_staff(ss: StaffSymbols, dark: np.ndarray, state: _State, first_sta
                 notes = []
                 for h in sorted(g.heads, key=lambda h: h.pos):
                     if state.clef.sign == "percussion":
-                        drum = drum_at(h.pos, "x" if h.sym.cls == "notehead_x" else "normal")
+                        drum = drum_at(h.pos, "x" if h.sym.cls.startswith("notehead_x") else "normal")
                         nh = NoteHead(drum.display, notehead=drum.notehead, instrument=drum.id, region=_region(h.sym))
                         nh._head = h  # type: ignore[attr-defined]
                         notes.append(nh)
