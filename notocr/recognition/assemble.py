@@ -746,12 +746,24 @@ def assemble(symbols: list[Symbol], layout: PageLayout, dark: np.ndarray, state:
     lower = getattr(upper, "lower", None) or _State(clef=BASS)
     upper.lower = lower  # type: ignore[attr-defined]  (carried to the next page)
     part = Part(name="Piano", abbreviation="Pno.", staves=2)
-    first = True
+    # pairs of staves: detected two-staff systems, plus neighbouring single staves whose
+    # joining barline wasn't found (e.g. bent photos)
+    pairs, singles = [], []
     for sy in layout.systems:
-        if len(sy.staves) != 2:
-            continue
-        top = _assemble_staff(by_staff[id(sy.staves[0])], dark, upper, first_staff=first)
-        bot = _assemble_staff(by_staff[id(sy.staves[1])], dark, lower, first_staff=first)
+        if len(sy.staves) == 2:
+            pairs.append((sy.staves[0], sy.staves[1]))
+        elif len(sy.staves) == 1:
+            singles.append(sy.staves[0])
+            if len(singles) == 2:
+                pairs.append((singles[0], singles[1]))
+                singles = []
+        if len(sy.staves) == 2 and singles:
+            singles = []  # an odd single staff before a real pair: can't place it
+    pairs.sort(key=lambda p: p[0].top())
+    first = True
+    for st_top, st_bot in pairs:
+        top = _assemble_staff(by_staff[id(st_top)], dark, upper, first_staff=first)
+        bot = _assemble_staff(by_staff[id(st_bot)], dark, lower, first_staff=first)
         lower.key, lower.time = upper.key, upper.time
         for i in range(max(len(top), len(bot))):
             mt = top[i] if i < len(top) else Measure()
