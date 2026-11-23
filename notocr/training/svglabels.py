@@ -25,9 +25,11 @@ NUM = re.compile(r"-?\d+(?:\.\d+)?(?:e-?\d+)?")
 
 # SVG classes whose glyph subtype is looked up in the calibration table
 GLYPH_GROUPS = {"Note": "Note", "Rest": "Rest", "Hook": "Hook", "Accidental": "Accidental",
-                "KeySig": "Accidental", "Clef": "Clef", "TimeSig": "TimeSig"}
+                "KeySig": "Accidental", "Clef": "Clef", "TimeSig": "TimeSig", "Dynamic": "Dynamic",
+                "Articulation": "Articulation"}
 # SVG classes with a fixed label
-FIXED = {"NoteDot": "dot", "TieSegment": "tie", "BarLine": "barline", "Stem": "stem"}
+FIXED = {"NoteDot": "dot", "TieSegment": "tie", "BarLine": "barline", "Stem": "stem", "SlurSegment": "slur",
+         "Fermata": "fermata"}
 
 
 @dataclass
@@ -168,6 +170,19 @@ def calibration_scores() -> list[tuple[str, str, Score, str | None]]:
     for base in (F(1), F(2), F(4)):
         out.append(("notehead_x", "Note", _score(_drum_notes(["hh", "ride", "crash", "ph"], base), clef=PERCUSSION,
                                                  percussion=True), None))
+    for dyn in ("pp", "p", "mp", "mf", "f", "ff", "sf", "fp"):
+        ms = _notes(LOW + HIGH, F(1))
+        for m in ms:
+            for e in m.events:
+                e.dynamic = dyn
+        out.append((f"dyn_{dyn}", "Dynamic", _score(ms), None))
+    for art, label in (("staccato", "staccato"), ("accent", "accent"), ("tenuto", "tenuto"),
+                       ("strong-accent", "marcato")):
+        ms = _notes(LOW + HIGH, F(1))
+        for m in ms:
+            for e in m.events:
+                e.articulations = [art]
+        out.append((label, "Articulation", _score(ms), None))
     out.append(("clef_perc", "Clef", _score(_drum_notes(["sn", "bd"], F(1)), clef=PERCUSSION, percussion=True), None))
     out.append(("clef_g", "Clef", _score(_notes(LOW, F(4)), clef=TREBLE), None))
     out.append(("clef_f", "Clef", _score(_notes([("C", 3)], F(4)), clef=BASS), None))
@@ -251,7 +266,9 @@ def label_elements(elements: list[Element], table: dict[str, str], space: float 
         if e.cls in ("StaffLines", "LedgerLine") and e.polyline
     ]
     for e in elements:
-        if e.cls in FIXED:
+        if e.cls == "BarLine" and not e.polyline:  # the dots of a repeat sign
+            labelled.append(("repeat_dot", e.box))
+        elif e.cls in FIXED:
             labelled.append((FIXED[e.cls], e.box))
         elif e.cls == "Tuplet" and not e.polyline:
             labelled.append(("tuplet_3", e.box))

@@ -99,6 +99,9 @@ def _write_note(parent, e: Event, idx: int, divisions: int, shown: list[str | No
             notations.append(("tied", head))
         if e.tuplet and i == 0 and (e.tuplet.start or e.tuplet.stop):
             notations.append(("tuplet", None))
+        first = i == 0 and head is not None
+        if first and (e.articulations or e.fermata or e.slur_start or e.slur_stop):
+            notations.append(("extra", None))
         if notations:
             nt = _sub(n, "notations")
             if head is not None and head.tie_stop:
@@ -110,6 +113,17 @@ def _write_note(parent, e: Event, idx: int, divisions: int, shown: list[str | No
                     _sub(nt, "tuplet", type="start", bracket="no" if e.beams else "yes")
                 if e.tuplet.stop:
                     _sub(nt, "tuplet", type="stop")
+            if first:
+                if e.slur_stop:
+                    _sub(nt, "slur", type="stop", number=1)
+                if e.slur_start:
+                    _sub(nt, "slur", type="start", number=1)
+                if e.articulations:
+                    art = _sub(nt, "articulations")
+                    for a in e.articulations:
+                        _sub(art, a)
+                if e.fermata:
+                    _sub(nt, "fermata", type="upright")
 
 
 class _State:
@@ -125,6 +139,10 @@ def _write_measure(
     pel, m: Measure, number: int, part: Part, divisions: int, state: _State, first: bool
 ):
     mel = _sub(pel, "measure", number=number)
+    if m.repeat_start:
+        bl = _sub(mel, "barline", location="left")
+        _sub(bl, "bar-style", "heavy-light")
+        _sub(bl, "repeat", direction="forward")
     if first or m.time or m.key is not None or m.clefs:
         attrs = _sub(mel, "attributes")
         if first:
@@ -169,6 +187,10 @@ def _write_measure(
         if gi < len(keys) - 1 and total > 0:
             b = _sub(mel, "backup")
             _sub(b, "duration", int(total * divisions))
+    if m.repeat_end:
+        bl = _sub(mel, "barline", location="right")
+        _sub(bl, "bar-style", "light-heavy")
+        _sub(bl, "repeat", direction="backward")
     return mel
 
 

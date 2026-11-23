@@ -18,6 +18,8 @@ EXCLUSIVE_GROUPS = [
     {c for c in CLASSES if c.startswith("flag_")},
     {"clef_g", "clef_f", "clef_c", "clef_perc"},
     {c for c in CLASSES if c.startswith("time_")},
+    {c for c in CLASSES if c.startswith("dyn_")},
+    {"staccato", "accent", "tenuto", "marcato"},
 ]
 
 

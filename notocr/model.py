@@ -132,6 +132,10 @@ class Event:
     beams: list[str] | None = None  # per beam level: begin / continue / end / forward hook / backward hook
     measure_rest: bool = False
     dynamic: str | None = None  # p, mf, ff ... placed below this event
+    articulations: list[str] = field(default_factory=list)  # staccato, accent, tenuto, strong-accent
+    fermata: bool = False
+    slur_start: bool = False
+    slur_stop: bool = False
     region: Region | None = None
 
     @property
@@ -158,6 +162,8 @@ class Measure:
     time_symbol: str | None = None  # "common" / "cut" when shown as C / ¢
     key: int | None = None  # fifths, set where it appears / changes
     clefs: dict[int, Clef] = field(default_factory=dict)  # staff number -> clef change
+    repeat_start: bool = False  # |:  at the start of this measure
+    repeat_end: bool = False  # :|  at the end of this measure
     region: Region | None = None
 
 

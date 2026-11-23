@@ -45,5 +45,21 @@ CLASSES = [
     "stem",
     "notehead_x",
     "clef_perc",
+    # v3: marks
+    "repeat_dot",
+    "dyn_pp",
+    "dyn_p",
+    "dyn_mp",
+    "dyn_mf",
+    "dyn_f",
+    "dyn_ff",
+    "dyn_sf",
+    "dyn_fp",
+    "staccato",
+    "accent",
+    "tenuto",
+    "marcato",
+    "fermata",
+    "slur",
 ]
 CLASS_INDEX = {c: i for i, c in enumerate(CLASSES)}

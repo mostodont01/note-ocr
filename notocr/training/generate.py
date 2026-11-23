@@ -235,6 +235,36 @@ def random_drum_part(rng: random.Random, n_measures: int) -> Part:
     return Part(name="Drumset", abbreviation="D. Set", measures=measures, percussion=True)
 
 
+ARTICULATIONS = ["staccato", "accent", "tenuto", "strong-accent"]
+
+
+def add_marks(part: Part, rng: random.Random):
+    """Repeats, articulations, fermatas and slurs (separate RNG: other content unchanged)."""
+    open_repeat = False
+    for mi, m in enumerate(part.measures):
+        if not open_repeat and rng.random() < 0.08 and mi > 0:
+            m.repeat_start, open_repeat = True, True
+        elif rng.random() < 0.08 and (open_repeat or rng.random() < 0.5):
+            m.repeat_end, open_repeat = True, False
+        notes = [e for e in m.events if e.notes and not part.percussion]
+        for e in notes:
+            if rng.random() < 0.08:
+                e.articulations = [rng.choice(ARTICULATIONS)]
+            if rng.random() < 0.012:
+                e.fermata = True
+        # slurs over 2-4 neighbouring notes of the same staff
+        i = 0
+        while i < len(notes) - 1:
+            if rng.random() < 0.08:
+                j = min(len(notes) - 1, i + rng.randint(1, 3))
+                if notes[j].staff == notes[i].staff and not notes[i].slur_start:
+                    notes[i].slur_start = True
+                    notes[j].slur_stop = True
+                    i = j + 1
+                    continue
+            i += 1
+
+
 def random_score(seed: int, n_measures: int | None = None, kind: str | None = "single") -> Score:
     """kind: single / piano / drums, or None to pick at random from the seed."""
     if kind is None:
@@ -251,6 +281,7 @@ def random_score(seed: int, n_measures: int | None = None, kind: str | None = "s
         for e in m.events:
             if rng.random() < 0.03:
                 e.dynamic = rng.choice(DYNAMICS)
+    add_marks(part, random.Random(seed * 31 + 17))
     title = " ".join(rng.choice(WORDS) for _ in range(rng.randint(1, 4))) if rng.random() < 0.7 else ""
     composer = rng.choice(["J. S. Bach", "Anon.", "W. A. Mozart", "Johann Pachelbel", ""])
     return Score(title=title, composer=composer, parts=[part])

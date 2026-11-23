@@ -543,6 +543,8 @@ def _assemble_staff(ss: StaffSymbols, dark: np.ndarray, state: _State, first_sta
             if m.events or any(in_m(s) for s in ss.syms):
                 measures.append(m)
 
+    _attach_marks(ss, measures, d)
+
     # ties (after all events exist)
     for a, b in tie_pairs:
         for m in measures:
@@ -571,6 +573,51 @@ def _assemble_staff(ss: StaffSymbols, dark: np.ndarray, state: _State, first_sta
                     del n._head
     # drop empty measures (e.g. the space after the final barline)
     return [m for m in measures if m.events]
+
+
+ARTICULATION_NAMES = {"staccato": "staccato", "accent": "accent", "tenuto": "tenuto", "marcato": "strong-accent"}
+
+
+def _attach_marks(ss: StaffSymbols, measures: list[Measure], d: float):
+    """Dynamics, articulations, fermatas and slurs -> nearest notes; repeat dots -> measures."""
+    events = [e for m in measures for e in m.events if e.region]
+    if not events:
+        return
+
+    def centre(e):
+        return e.region.x + e.region.w / 2
+
+    def nearest(x, max_dx, notes_only=True, key=centre):
+        cands = [e for e in events if (e.notes or not notes_only) and abs(key(e) - x) <= max_dx]
+        return min(cands, key=lambda e: abs(key(e) - x)) if cands else None
+
+    for s in ss.of("dyn_"):
+        e = nearest(s.x0, 3 * d, notes_only=False, key=lambda e: e.region.x)
+        if e is not None:
+            e.dynamic = s.cls[4:]
+    for s in ss.of("staccato", "accent", "tenuto", "marcato"):
+        e = nearest(s.cx, 1.2 * d)
+        if e is not None and ARTICULATION_NAMES[s.cls] not in e.articulations:
+            e.articulations.append(ARTICULATION_NAMES[s.cls])
+    for s in ss.of("fermata"):
+        e = nearest(s.cx, 2 * d, notes_only=False)
+        if e is not None:
+            e.fermata = True
+    for s in ss.of("slur"):
+        a = nearest(s.x0, 1.5 * d)
+        b = nearest(s.x1, 1.5 * d)
+        if a is not None and b is not None and a is not b and centre(a) < centre(b):
+            a.slur_start = True
+            b.slur_stop = True
+    dots = ss.of("repeat_dot")
+    for m in measures:
+        if not m.region or not dots:
+            continue
+        x0, x1 = m.region.x, m.region.x + m.region.w
+        if sum(1 for s in dots if 0 < s.cx - x0 < 1.5 * d) >= 1 and x0 > ss.staff.x0:
+            m.repeat_start = True
+        if sum(1 for s in dots if 0 < x1 - s.cx < 1.5 * d) >= 1:
+            m.repeat_end = True
 
 
 def check_measures(part: Part) -> list[int]:
