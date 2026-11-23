@@ -162,6 +162,10 @@ class Backend(QObject):
                 info["note"] = " + ".join(n.instrument for n in e.notes)
             name = DURATIONS.get(str(e.base), str(e.base))
             info["duration"] = name + ("." * e.dots) + (" (triplet)" if e.tuplet else "")
+            marks = [e.dynamic or ""] + e.articulations + (["fermata"] if e.fermata else [])
+            marks += ["slur start"] if e.slur_start else []
+            marks += ["slur end"] if e.slur_stop else []
+            info["marks"] = " · ".join(x for x in marks if x)
         return info
 
     @Property(str, notify=selectionChanged)

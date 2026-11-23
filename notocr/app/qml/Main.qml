@@ -359,6 +359,7 @@ ApplicationWindow {
 									SectionLabel { text: "Note" }
 									Label { text: app.selInfo.note || ""; font.pixelSize: 22; color: theme.text }
 									Label { text: app.selInfo.duration || ""; color: theme.muted }
+									Label { visible: !!app.selInfo.marks; text: app.selInfo.marks || ""; color: theme.accent }
 									Flow {
 										Layout.fillWidth: true
 										spacing: 4

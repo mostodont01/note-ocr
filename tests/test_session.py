@@ -100,3 +100,17 @@ def test_playback(session):
     audio = render(snd)
     assert audio.shape[0] > 22050 * 3 and np.abs(audio).max() <= 1.0
     assert wav_bytes(audio)[:4] == b"RIFF"
+
+
+def test_playback_repeats_and_dynamics():
+    from notocr.model import Event, Measure, NoteHead, Part, Pitch, Score
+    from notocr.playback import play_order
+
+    ms = [Measure([Event([NoteHead(Pitch("C", 4))], F(4))]) for _ in range(4)]
+    ms[1].repeat_start = True
+    ms[2].repeat_end = True
+    assert play_order(ms) == [0, 1, 2, 1, 2, 3]
+    ms[0].events[0].dynamic = "pp"
+    ms[3].events[0].dynamic = "ff"
+    snd = timeline(Score(parts=[Part(measures=ms)]), bpm=60)
+    assert len(snd) == 6 and snd[0].gain < snd[-1].gain

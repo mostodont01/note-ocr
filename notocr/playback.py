@@ -18,6 +18,25 @@ from .model import Score
 SR = 22050
 
 
+DYNAMIC_GAIN = {"pp": 0.25, "p": 0.4, "mp": 0.55, "mf": 0.7, "f": 0.85, "ff": 1.0, "sf": 1.0, "fp": 0.85}
+
+
+def play_order(measures) -> list[int]:
+    """Measure indexes in playing order, repeats unrolled (each repeat played twice)."""
+    order, start, i, done = [], 0, 0, set()
+    while i < len(measures):
+        m = measures[i]
+        if m.repeat_start:
+            start = i
+        order.append(i)
+        if m.repeat_end and i not in done:
+            done.add(i)
+            i = start
+            continue
+        i += 1
+    return order
+
+
 @dataclass
 class Sound:
     start: float  # seconds
@@ -28,6 +47,7 @@ class Sound:
     event: int
     page: int = -1
     uid: int = -1
+    gain: float = 0.7
 
 
 def timeline(score: Score, bpm: float = 100.0) -> list[Sound]:
@@ -38,21 +58,31 @@ def timeline(score: Score, bpm: float = 100.0) -> list[Sound]:
     if not score.parts:
         return out
     part = score.parts[0]
-    for mi, m in enumerate(part.measures):
+    gain = 0.7
+    for mi in play_order(part.measures):
+        m = part.measures[mi]
         pos: dict[tuple[int, int], F] = {}
         longest = F(0)
         for ei, e in enumerate(m.events):
             key = (e.staff, e.voice)
             p = pos.get(key, F(0))
+            if e.dynamic in DYNAMIC_GAIN:
+                gain = DYNAMIC_GAIN[e.dynamic]
+            dur = float(e.duration) * q
+            if e.fermata:
+                dur *= 2
             if e.notes and not all(n.tie_stop for n in e.notes):
+                played = dur * (0.45 if "staccato" in e.articulations else 1.0)
+                accent = 1.3 if {"accent", "strong-accent"} & set(e.articulations) else 1.0
                 out.append(Sound(
-                    t0 + float(p) * q, float(e.duration) * q,
+                    t0 + float(p) * q, played,
                     [n.pitch.midi for n in e.notes if not part.percussion],
                     [n.instrument or "sn" for n in e.notes] if part.percussion else [],
                     mi, ei,
                     e.region.page if e.region else -1, e.region.uid if e.region else -1,
+                    min(1.0, gain * accent),
                 ))
-            pos[key] = p + e.duration
+            pos[key] = p + e.duration + (e.duration if e.fermata else 0)
             longest = max(longest, pos[key])
         t0 += float(longest) * q
     return out
@@ -94,10 +124,10 @@ def render(sounds: list[Sound]) -> np.ndarray:
     for s in sounds:
         i = int(SR * s.start)
         for m in s.midi:
-            y = _tone(m, s.dur) * 0.25
+            y = _tone(m, s.dur) * 0.35 * s.gain
             buf[i : i + len(y)] += y[: len(buf) - i]
         for d in s.drums:
-            y = _drum(d, rng) * 0.6
+            y = _drum(d, rng) * 0.85 * s.gain
             buf[i : i + len(y)] += y[: len(buf) - i]
     peak = float(np.abs(buf).max()) or 1.0
     return buf / max(peak, 1.0) * 0.9
