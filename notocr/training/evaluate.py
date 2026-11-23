@@ -24,12 +24,28 @@ from .generate import random_score
 
 
 def tokens(score: Score) -> list[tuple]:
+    """One token per onset and staff: all notes sounding there (any voice) + shortest
+    duration. Voice-agnostic, so a chord and the same notes in two voices compare equal."""
+    from fractions import Fraction
+
     out = []
     for part in score.parts:
         for m in part.measures:
+            pos: dict[tuple[int, int], Fraction] = {}
+            at: dict[tuple[int, Fraction], list] = {}
             for e in m.events:
-                pitches = tuple(sorted((n.pitch.midi, n.notehead) for n in e.notes)) or ("rest",)
-                out.append((pitches, e.duration))
+                key = (e.staff, e.voice)
+                p = pos.get(key, Fraction(0))
+                at.setdefault((e.staff, p), []).append(e)
+                pos[key] = p + e.duration
+            for (staff, p) in sorted(at):
+                evs = at[(staff, p)]
+                notes = [e for e in evs if e.notes]
+                if notes:
+                    pitches = tuple(sorted({(n.pitch.midi, n.notehead) for e in notes for n in e.notes}))
+                    out.append((pitches, min(e.duration for e in notes)))
+                else:
+                    out.append((("rest",), min(e.duration for e in evs)))
     return out
 
 

@@ -384,6 +384,14 @@ def _assemble_staff(ss: StaffSymbols, dark: np.ndarray, state: _State, first_sta
             else:
                 groups.append(Group([h], None))
 
+    # ---- stem direction from the whole chord: the stem sticks out above (up) or below
+    # (down) all of its note heads
+    for g in groups:
+        if g.stem is not None:
+            top = min(h.sym.cy for h in g.heads)
+            bottom = max(h.sym.cy for h in g.heads)
+            g.up = (top - g.stem.y0) > (g.stem.y1 - bottom)
+
     # ---- durations: flags, beams
     for g in groups:
         if g.stem is None:
@@ -521,6 +529,7 @@ def _assemble_staff(ss: StaffSymbols, dark: np.ndarray, state: _State, first_sta
                 y_hi = max([h.sym.y1 for h in g.heads] + ([g.stem.y1] if g.stem else []))
                 ev = Event(notes, base, g.dots, region=Region(x_lo, y_lo, x_hi - x_lo, y_hi - y_lo, confidence=score,
                                                              uid=min(h.sym.uid for h in g.heads)))
+                ev._up = g.up if g.stem is not None else None  # type: ignore[attr-defined]
             else:
                 ri, r = it
                 ev = Event([], REST_BASE[r.cls], rest_dots.get(ri, 0), region=_region(r))
@@ -537,6 +546,8 @@ def _assemble_staff(ss: StaffSymbols, dark: np.ndarray, state: _State, first_sta
             best = min(range(len(m.events) - 2), key=lambda i: abs(sum(centres[i : i + 3]) / 3 - tsym.cx))
             for k in range(3):
                 m.events[best + k].tuplet = Tuplet(3, 2, start=k == 0, stop=k == 2)
+
+        _split_voices(m, st, d, percussion=state.clef.sign == "percussion")
 
         # measure rests written as a whole rest in other time signatures
         if m.events or mi < len(intervals) - 1:
@@ -568,11 +579,81 @@ def _assemble_staff(ss: StaffSymbols, dark: np.ndarray, state: _State, first_sta
             nb.pitch = na.pitch
     for m in measures:
         for e in m.events:
+            if hasattr(e, "_up"):
+                del e._up
             for n in e.notes:
                 if hasattr(n, "_head"):
                     del n._head
     # drop empty measures (e.g. the space after the final barline)
     return [m for m in measures if m.events]
+
+
+def _split_voices(m: Measure, st: Staff, d: float, percussion: bool):
+    """Two voices on one staff: stems up = voice 1, stems down = voice 2.
+
+    Used when up- and down-stem notes sound together (same horizontal position), e.g.
+    drums with hands up / feet down. Rests go to the voice whose side they are on."""
+    def cx(e):
+        return e.region.x + e.region.w / 2 if e.region else 0.0
+
+    ups = [e for e in m.events if getattr(e, "_up", None) is True]
+    downs = [e for e in m.events if getattr(e, "_up", None) is False]
+    if not ups or not downs:
+        return
+    # only when up- and down-stem notes sound together; a single voice may mix stem
+    # directions (also on drum staves)
+    if not any(abs(cx(a) - cx(b)) < 0.6 * d for a in ups for b in downs):
+        return
+    mid = (st.top() + st.bottom()) / 2
+    for e in m.events:
+        up = getattr(e, "_up", None)
+        if up is None:
+            below = e.region is not None and e.region.y + e.region.h / 2 > mid + 0.5 * d
+            e.voice = 2 if (e.is_rest and below) else 1
+        else:
+            e.voice = 1 if up else 2
+    m.events.sort(key=lambda e: e.voice)  # stable: x order kept within each voice
+    _align_voice2(m, d)
+
+
+def _rest_values(length: F) -> list[tuple[F, int]]:
+    """Split a gap into standard rest values (base, dots), longest first."""
+    out = []
+    for base in (F(4), F(2), F(1), F(1, 2), F(1, 4), F(1, 8), F(1, 16)):
+        while length >= base:
+            if length >= base * F(3, 2) and base >= F(1, 4):
+                out.append((base, 1))
+                length -= base * F(3, 2)
+            else:
+                out.append((base, 0))
+                length -= base
+    return out
+
+
+def _align_voice2(m: Measure, d: float):
+    """Voice 2 timing from the x position of voice 1 notes above it (its rests are often
+    hidden); gaps become invisible rests."""
+    v1 = [e for e in m.events if e.voice == 1]
+    v2 = [e for e in m.events if e.voice == 2]
+    if not v1 or not v2:
+        return
+    onsets, pos = [], F(0)
+    for e in v1:
+        if e.region:
+            onsets.append((e.region.x + e.region.w / 2, pos))
+        pos += e.duration
+    new_v2, pos = [], F(0)
+    for e in v2:
+        if e.region:
+            x = e.region.x + e.region.w / 2
+            near = min(onsets, key=lambda o: abs(o[0] - x))
+            if abs(near[0] - x) < 0.8 * d and near[1] > pos:
+                for base, dots in _rest_values(near[1] - pos):
+                    new_v2.append(Event([], base, dots, voice=2, staff=e.staff))
+                pos = near[1]
+        new_v2.append(e)
+        pos += e.duration
+    m.events = v1 + new_v2
 
 
 ARTICULATION_NAMES = {"staccato": "staccato", "accent": "accent", "tenuto": "tenuto", "marcato": "strong-accent"}
