@@ -55,8 +55,14 @@ notocr/
     corrections store (SQLite + crops), retrain / fine-tune, export to ONNX
 ```
 
-Detector candidates: small YOLO-style detector (watch licences: Ultralytics is AGPL,
-fine for personal use) or torchvision detection models. Run inference via ONNX Runtime.
+Detector (decided 2026-11-09): own small CenterNet-style network in plain PyTorch
+(~0.9 M parameters, no AGPL dependency), input scaled to 10 px staff line distance.
+ONNX Runtime for inference can come with packaging (M12).
+
+Training labels: MuseScore SVG export tags every element with its class (Note, Rest,
+Hook, Accidental, KeySig, Clef, TimeSig, Stem, Beam, BarLine, TieSegment, Tuplet,
+NoteDot) in absolute coordinates; glyph subtypes come from outline signatures,
+calibrated automatically per music font (8 fonts).
 
 ## Milestones
 
@@ -81,8 +87,6 @@ handwritten music.
 
 ## Open questions / to verify
 
-- MuseScore SVG export: do elements carry class names (Note, Rest, Clef, …) usable as
-  bounding-box labels? If not, get boxes another way (layout data / per-element render).
 - Firefox: `tabs.captureVisibleTab` only captures the visible tab; check whether it works
   on Firefox's built-in PDF viewer.
 - Which music corpus to render for synthetic data (OpenScore, own MuseScore files, …).
