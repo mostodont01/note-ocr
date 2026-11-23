@@ -31,6 +31,7 @@ class Symbol:
     y0: float
     x1: float
     y1: float
+    uid: int = -1  # stable id within a page (set by the app session)
 
     @property
     def cx(self) -> float:

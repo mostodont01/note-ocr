@@ -47,6 +47,7 @@ class Region:
     h: float
     page: int = 0
     confidence: float = 1.0
+    uid: int = -1  # id of the symbol it was read from (links notes to the image)
 
 
 @dataclass(frozen=True)

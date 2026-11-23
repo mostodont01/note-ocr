@@ -13,6 +13,7 @@ dependencies = [
     "svgelements",
     "cairosvg",
     "pymupdf>=2.1",
+    "pyside6>=6.12.0",
 ]
 
 [project.scripts]
@@ -21,6 +22,7 @@ notocr = "notocr.cli:main"
 [dependency-groups]
 dev = [
     "pytest",
+    "pytest-qt>=4.5.0",
 ]
 
 [build-system]

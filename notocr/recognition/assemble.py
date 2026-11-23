@@ -123,7 +123,7 @@ def _assign_to_staves(symbols: list[Symbol], layout: PageLayout) -> list[StaffSy
 
 
 def _region(s: Symbol) -> Region:
-    return Region(s.x0, s.y0, s.w, s.h, confidence=s.score)
+    return Region(s.x0, s.y0, s.w, s.h, confidence=s.score, uid=s.uid)
 
 
 # ------------------------------------------------------------------------ stems, beams
@@ -519,7 +519,8 @@ def _assemble_staff(ss: StaffSymbols, dark: np.ndarray, state: _State, first_sta
                 y_lo = min([h.sym.y0 for h in g.heads] + ([g.stem.y0] if g.stem else []))
                 x_hi = max(h.sym.x1 for h in g.heads)
                 y_hi = max([h.sym.y1 for h in g.heads] + ([g.stem.y1] if g.stem else []))
-                ev = Event(notes, base, g.dots, region=Region(x_lo, y_lo, x_hi - x_lo, y_hi - y_lo, confidence=score))
+                ev = Event(notes, base, g.dots, region=Region(x_lo, y_lo, x_hi - x_lo, y_hi - y_lo, confidence=score,
+                                                             uid=min(h.sym.uid for h in g.heads)))
             else:
                 ri, r = it
                 ev = Event([], REST_BASE[r.cls], rest_dots.get(ri, 0), region=_region(r))
