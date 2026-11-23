@@ -18,7 +18,8 @@ import numpy as np
 
 from ..ingest import binarize, darkness, load_gray
 from ..model import Event, Pitch, Score
-from ..pipeline import DEFAULT_WEIGHTS, _BEAM_MASK_SKIP, merge_pages
+from ..paths import CORRECTIONS, active_model
+from ..pipeline import _BEAM_MASK_SKIP, merge_pages
 from ..recognition.assemble import _State, assemble, check_measures
 from ..recognition.detect import Symbol, SymbolDetector
 from ..recognition.net import NORM_SPACING
@@ -70,8 +71,10 @@ class MeasureInfo:
 
 
 class Session:
-    def __init__(self, weights: str | Path = DEFAULT_WEIGHTS, detector: SymbolDetector | None = None):
-        self.weights = Path(weights)
+    def __init__(self, weights: str | Path | None = None, detector: SymbolDetector | None = None,
+                 corrections: str | Path | None = CORRECTIONS):
+        self.weights = Path(weights) if weights else active_model()
+        self.corrections_dir = Path(corrections) if corrections else None
         self._detector = detector
         self.source: Path | None = None
         self.pages: list[Page] = []
@@ -281,6 +284,8 @@ class Session:
         }
         path = self.project_path()
         path.write_text(json.dumps(data))
+        if self.corrections_dir and any(p.edited for p in self.pages):
+            self.export_training(self.corrections_dir)
         return path
 
     def _load_project(self):

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 import cv2
@@ -58,8 +59,34 @@ def main(argv=None):
     r.add_argument("--debug", help="folder for debug images")
     r.add_argument("--weights")
     r.set_defaults(func=cmd_recognize)
+    app = sub.add_parser("app", help="open the desktop app")
+    app.add_argument("file", nargs="?")
+    app.set_defaults(func=lambda a: sys.exit(__import__("notocr.app.backend", fromlist=["main"]).main(
+        [sys.argv[0]] + ([a.file] if a.file else []))))
+    rt = sub.add_parser("retrain", help="fine-tune the detector with your corrections")
+    rt.add_argument("--steps", type=int, default=400)
+    rt.set_defaults(func=lambda a: __import__("notocr.training.finetune", fromlist=["finetune"]).finetune(steps=a.steps))
+    inst = sub.add_parser("install-desktop", help="add note-OCR to the app menu")
+    inst.set_defaults(func=cmd_install_desktop)
     a = ap.parse_args(argv)
     a.func(a)
+
+
+def cmd_install_desktop(a):
+    import shutil
+
+    apps = Path.home() / ".local" / "share" / "applications"
+    icons = Path.home() / ".local" / "share" / "icons" / "hicolor" / "scalable" / "apps"
+    apps.mkdir(parents=True, exist_ok=True)
+    icons.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(Path(__file__).parent / "app" / "assets" / "notocr.svg", icons / "notocr.svg")
+    exe = shutil.which("notocr") or f"{sys.executable} -m notocr.cli"
+    (apps / "notocr.desktop").write_text(
+        "[Desktop Entry]\nType=Application\nName=note-OCR\nComment=Sheet music to MuseScore\n"
+        f"Exec={exe} app %f\nIcon=notocr\nTerminal=false\nCategories=AudioVideo;Music;\n"
+        "MimeType=application/pdf;image/png;image/jpeg;\nStartupWMClass=notocr\n"
+    )
+    print("installed:", apps / "notocr.desktop")
 
 
 if __name__ == "__main__":

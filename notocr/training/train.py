@@ -31,8 +31,9 @@ class CropStream(IterableDataset):
     def __init__(self, roots: list[str], crop: int = CROP, cache: int = 48):
         self.items = []
         for root in roots:
+            root, _, rep = str(root).partition("*")  # "dir*K" repeats a set K times
             root = Path(root)
-            for it in json.loads((root / "index.json").read_text()):
+            for it in json.loads((root / "index.json").read_text()) * int(rep or 1):
                 self.items.append((str(root / it["image"]), np.array(it["boxes"], dtype=np.float32).reshape(-1, 5)))
         self.crop = crop
         self.cache_size = cache

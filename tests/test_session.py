@@ -49,7 +49,7 @@ class FakeDetector:
 @pytest.fixture
 def session(tmp_path):
     path, top, sp = page_image(tmp_path)
-    s = Session(detector=FakeDetector(top, sp))
+    s = Session(detector=FakeDetector(top, sp), corrections=tmp_path / "corrections")
     s.open(path, use_saved=False)
     return s
 
@@ -86,7 +86,8 @@ def test_add_delete_save_reload(session, tmp_path):
     h = heads(session)[0]
     session.override(0, h.uid, steps=-1)
     session.save()
-    s2 = Session(detector=None)
+    assert (tmp_path / "corrections" / "index.json").exists()  # edited page exported on save
+    s2 = Session(detector=None, corrections=None)
     s2.open(session.source)  # loads saved symbols: no detector needed
     assert str(s2.score.parts[0].measures[0].events[0].notes[0].pitch) == "A4"
     n = s2.export_training(tmp_path / "corr")

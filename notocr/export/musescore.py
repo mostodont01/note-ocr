@@ -36,16 +36,22 @@ def mscore_command() -> list[str]:
 
 
 def _run(args: list[str], timeout: float = 600) -> subprocess.CompletedProcess:
-    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    # a clean Qt environment: inside our PySide6 app, inherited QT_* / QML* variables
+    # would make MuseScore load PySide's Qt plugins and fail
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("QT_", "QML", "QTWEBENGINE"))}
+    env["QT_QPA_PLATFORM"] = "offscreen"
     r = subprocess.run(mscore_command() + args, capture_output=True, text=True, timeout=timeout, env=env)
     if r.returncode != 0:
         raise RuntimeError(f"MuseScore failed ({r.returncode}):\n{r.stderr[-2000:]}")
     return r
 
 
-def convert(src: str | Path, dst: str | Path, style: str | Path | None = None) -> Path:
-    """Convert one file (format from the extension), e.g. .musicxml -> .mscz."""
+def convert(src: str | Path, dst: str | Path, style: str | Path | None = None, dpi: int | None = None) -> Path:
+    """Convert one file (format from the extension), e.g. .musicxml -> .mscz.
+    `dpi`: resolution for .png output."""
     args = ["-o", str(Path(dst).resolve()), str(Path(src).resolve())]
+    if dpi:
+        args = ["-r", str(dpi)] + args
     if style:
         args = ["-S", str(Path(style).resolve())] + args
     _run(args)

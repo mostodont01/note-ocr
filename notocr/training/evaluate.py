@@ -33,7 +33,24 @@ def tokens(score: Score) -> list[tuple]:
     return out
 
 
-def main():
+def evaluate(weights, root, limit: int = 0, kind=None, verbose: bool = False) -> dict:
+    """End-to-end + detection scores of `weights` on a labelled set."""
+    import sys
+
+    argv = ["evaluate", str(root), "--weights", str(weights)]
+    if limit:
+        argv += ["--limit", str(limit)]
+    if kind:
+        argv += ["--kind", kind]
+    old = sys.argv
+    sys.argv = argv
+    try:
+        return main(quiet=not verbose)
+    finally:
+        sys.argv = old
+
+
+def main(quiet: bool = False):
     ap = argparse.ArgumentParser()
     ap.add_argument("data")
     ap.add_argument("--weights", default=None)
@@ -73,14 +90,15 @@ def main():
         if m:
             by_seed[int(m.group(1))].append((int(m.group(2)), res.score))
 
-    print(f"{'class':16s} {'prec':>6s} {'recall':>6s} {'n':>6s}")
+    say = (lambda *a: None) if quiet else print
+    say(f"{'class':16s} {'prec':>6s} {'recall':>6s} {'n':>6s}")
     for c in CLASSES:
         n = tp[c] + fn[c]
         if n == 0 and fp[c] == 0:
             continue
         p = tp[c] / max(tp[c] + fp[c], 1)
         r = tp[c] / max(n, 1)
-        print(f"{c:16s} {p:6.3f} {r:6.3f} {n:6d}")
+        say(f"{c:16s} {p:6.3f} {r:6.3f} {n:6d}")
 
     tot = match = pitch_ok = dur_ok = 0
     for seed, pages in sorted(by_seed.items()):
@@ -95,10 +113,15 @@ def main():
         sm_d = difflib.SequenceMatcher(a=[t[1] for t in gt], b=[t[1] for t in got], autojunk=False)
         pitch_ok += sum(b.size for b in sm_p.get_matching_blocks())
         dur_ok += sum(b.size for b in sm_d.get_matching_blocks())
+    tps, fps, fns = sum(tp.values()), sum(fp.values()), sum(fn.values())
+    result = {"det_f1": 2 * tps / max(2 * tps + fps + fns, 1), "events": tot,
+              "acc": match / tot if tot else None}
     if tot:
-        print(f"\nend to end over {len(by_seed)} scores, {tot} events:")
-        print(f"  events fully right (pitch + duration): {match / tot:.1%}")
-        print(f"  pitch right: {pitch_ok / tot:.1%}   duration right: {dur_ok / tot:.1%}")
+        say(f"\nend to end over {len(by_seed)} scores, {tot} events:")
+        say(f"  events fully right (pitch + duration): {match / tot:.1%}")
+        say(f"  pitch right: {pitch_ok / tot:.1%}   duration right: {dur_ok / tot:.1%}")
+    say(f"  detection F1: {result['det_f1']:.3f}")
+    return result
 
 
 if __name__ == "__main__":

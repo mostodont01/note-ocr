@@ -13,7 +13,9 @@ from .recognition.assemble import assemble, check_measures
 from .recognition.detect import Symbol, SymbolDetector
 from .recognition.staff import PageLayout, detect_staves, estimate_skew, rotate
 
-DEFAULT_WEIGHTS = Path(__file__).resolve().parent.parent / "models" / "detector.pt"
+from .paths import active_model
+
+DEFAULT_WEIGHTS = active_model()
 
 # symbols erased before counting beams, so they aren't mistaken for beams
 _BEAM_MASK_SKIP = {"stem", "barline"}

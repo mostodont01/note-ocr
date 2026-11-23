@@ -5,6 +5,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Qt runtime libraries (headless QML tests)
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
       - uses: astral-sh/setup-uv@v6
       - run: uv sync
       - run: QT_QPA_PLATFORM=offscreen uv run pytest -q tests
