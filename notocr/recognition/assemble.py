@@ -613,7 +613,9 @@ def assemble(symbols: list[Symbol], layout: PageLayout, dark: np.ndarray, state:
         return part
 
     # grand staff
-    upper, lower = _State(), _State(clef=BASS)
+    upper = state or _State()
+    lower = getattr(upper, "lower", None) or _State(clef=BASS)
+    upper.lower = lower  # type: ignore[attr-defined]  (carried to the next page)
     part = Part(name="Piano", abbreviation="Pno.", staves=2)
     first = True
     for sy in layout.systems:

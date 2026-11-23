@@ -16,11 +16,15 @@ def cmd_recognize(a):
     from .export import musescore
     from .export.musicxml import append_measures, write_musicxml
     from .pipeline import Recognizer
+    from .recognition.assemble import check_measures
     from .recognition.detect import draw_symbols
     from .recognition.staff import draw_layout
 
     rec = Recognizer(a.weights) if a.weights else Recognizer()
-    res = rec.file(a.image)
+    score, pages = rec.document(a.image)
+    res = pages[0]
+    res.score = score
+    res.bad_measures = check_measures(score.parts[0]) if score.parts else []
     out = Path(a.output or Path(a.image).with_suffix(".musicxml"))
     out.parent.mkdir(parents=True, exist_ok=True)
     if a.append:
@@ -46,7 +50,7 @@ def cmd_recognize(a):
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="notocr")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    r = sub.add_parser("recognize", help="image -> MusicXML")
+    r = sub.add_parser("recognize", help="image or PDF -> MusicXML")
     r.add_argument("image")
     r.add_argument("-o", "--output")
     r.add_argument("--append", help="existing MusicXML to append the measures to")
