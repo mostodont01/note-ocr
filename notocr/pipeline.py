@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .ingest import binarize, load_gray
+from .ingest import binarize, darkness, load_gray
 from .model import Score
 from .recognition.assemble import assemble, check_measures
 from .recognition.detect import Symbol, SymbolDetector
@@ -46,7 +46,7 @@ class Recognizer:
         spacing = float(np.median([s.spacing() for s in layout.staves]))
         symbols = self.detector.detect(gray, spacing, self.threshold)
         # ink darkness for stems / beams; other symbols blanked so they aren't taken for beams
-        dark = 1.0 - gray.astype(np.float32) / 255.0
+        dark = darkness(gray)
         for s in symbols:
             if s.cls not in _BEAM_MASK_SKIP:
                 dark[max(int(s.y0), 0) : int(np.ceil(s.y1)), max(int(s.x0), 0) : int(np.ceil(s.x1))] = 0.0
