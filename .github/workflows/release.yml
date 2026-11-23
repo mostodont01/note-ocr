@@ -25,9 +25,12 @@ jobs:
           uv pip install --no-deps -e .
       - name: Build app
         run: uv run --no-sync pyinstaller --noconfirm --distpath build/dist --workpath build/work packaging/notocr.spec
-      - name: Smoke test (CLI)
-        if: runner.os == 'Linux'
-        run: build/dist/notocr/notocr --help
+      - name: Smoke test (CLI, ONNX model loads and runs)
+        shell: bash
+        run: |
+          uv run --no-sync python -c "import cv2, numpy as np; img = np.full((300, 900), 255, np.uint8); [cv2.line(img, (40, 100 + 14 * i), (860, 100 + 14 * i), 0, 2) for i in range(5)]; cv2.imwrite('smoke.png', img)"
+          build/dist/notocr/notocr recognize smoke.png -o smoke.musicxml
+          test -s smoke.musicxml
       - name: AppImage
         if: runner.os == 'Linux'
         run: |
