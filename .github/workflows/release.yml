@@ -1,0 +1,68 @@
+name: Release
+# Tag v* -> GitHub release with the Linux AppImage, the Windows app (zip) and the
+# Firefox extension. Run it by hand (workflow_dispatch) to only build the artifacts.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Install (inference only, no PyTorch)
+        run: |
+          uv venv
+          uv pip install numpy opencv-python-headless pillow pymupdf onnxruntime pyside6 svgelements pyinstaller
+          uv pip install --no-deps -e .
+      - name: Build app
+        run: uv run --no-sync pyinstaller --noconfirm --distpath build/dist --workpath build/work packaging/notocr.spec
+      - name: Smoke test (CLI)
+        if: runner.os == 'Linux'
+        run: build/dist/notocr/notocr --help
+      - name: AppImage
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update && sudo apt-get install -y libfuse2
+          curl -sSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          APPIMAGETOOL=./appimagetool sh packaging/build-appimage.sh build/dist/notocr note-OCR-x86_64.AppImage
+      - name: Windows zip
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path build/dist/notocr -DestinationPath note-OCR-windows-x64.zip
+      - name: Firefox extension
+        if: runner.os == 'Linux'
+        run: cd firefox && zip -r ../note-OCR-firefox.xpi manifest.json background.js overlay.js icons
+      - uses: actions/upload-artifact@v4
+        with:
+          name: note-OCR-${{ runner.os }}
+          path: |
+            note-OCR-x86_64.AppImage
+            note-OCR-windows-x64.zip
+            note-OCR-firefox.xpi
+          if-no-files-found: ignore
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            note-OCR-x86_64.AppImage
+            note-OCR-windows-x64.zip
+            note-OCR-firefox.xpi

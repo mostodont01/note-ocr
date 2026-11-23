@@ -9,7 +9,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent.parent
+import sys
+
+# in a PyInstaller bundle the data files sit next to the package in sys._MEIPASS
+REPO = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
 USER_DATA = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "notocr"
 USER_MODELS = USER_DATA / "models"
 CORRECTIONS = USER_DATA / "corrections"
@@ -23,7 +26,9 @@ def active_model() -> Path:
     user = USER_MODELS / "detector.pt"
     if user.exists():
         return user
-    return REPO_MODEL
+    if REPO_MODEL.exists() or not REPO_MODEL.with_suffix(".onnx").exists():
+        return REPO_MODEL
+    return REPO_MODEL.with_suffix(".onnx")
 
 
 def synthetic_sets() -> list[Path]:

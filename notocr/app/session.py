@@ -22,7 +22,7 @@ from ..paths import CORRECTIONS, active_model
 from ..pipeline import _BEAM_MASK_SKIP, merge_pages
 from ..recognition.assemble import _State, assemble, check_measures
 from ..recognition.detect import Symbol, SymbolDetector
-from ..recognition.net import NORM_SPACING
+from ..recognition.classes import NORM_SPACING
 from ..recognition.staff import PageLayout, detect_staves, estimate_skew, rotate
 
 # default symbol sizes in staff spaces (w, h), used when adding a symbol by hand
@@ -300,7 +300,7 @@ class Session:
     def export_training(self, root: str | Path, only_edited: bool = True) -> int:
         """Edited pages -> training data (normalised image + boxes), same format as
         the synthetic sets. Returns the number of pages written."""
-        from ..recognition.net import CLASS_INDEX
+        from ..recognition.classes import CLASS_INDEX
 
         root = Path(root)
         (root / "images").mkdir(parents=True, exist_ok=True)

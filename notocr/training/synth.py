@@ -22,7 +22,7 @@ from PIL import Image
 
 from ..export import musescore
 from ..export.musicxml import write_musicxml
-from ..recognition.net import CLASS_INDEX, NORM_SPACING
+from ..recognition.classes import CLASS_INDEX, NORM_SPACING
 from .generate import random_score
 from .svglabels import calibrate, label_elements, load_table, parse_svg, save_table
 

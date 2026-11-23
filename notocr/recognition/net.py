@@ -11,53 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as Fn
 
-NORM_SPACING = 10.0
-STRIDE = 4
-
-CLASSES = [
-    "notehead_black",
-    "notehead_half",
-    "notehead_whole",
-    "rest_whole",
-    "rest_half",
-    "rest_quarter",
-    "rest_8th",
-    "rest_16th",
-    "rest_32nd",
-    "clef_g",
-    "clef_f",
-    "clef_c",
-    "sharp",
-    "flat",
-    "natural",
-    "double_sharp",
-    "double_flat",
-    "dot",
-    "flag_8th_up",
-    "flag_8th_down",
-    "flag_16th_up",
-    "flag_16th_down",
-    "flag_32nd_up",
-    "flag_32nd_down",
-    "time_1",
-    "time_2",
-    "time_3",
-    "time_4",
-    "time_5",
-    "time_6",
-    "time_7",
-    "time_8",
-    "time_9",
-    "time_common",
-    "time_cut",
-    "tuplet_3",
-    "tie",
-    "barline",
-    "stem",
-    "notehead_x",
-    "clef_perc",
-]
-CLASS_INDEX = {c: i for i, c in enumerate(CLASSES)}
+from .classes import CLASS_INDEX, CLASSES, NORM_SPACING, STRIDE  # noqa: F401  (re-exported)
 
 
 class Block(nn.Module):

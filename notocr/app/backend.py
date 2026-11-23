@@ -11,7 +11,7 @@ from pathlib import Path
 import cv2
 from PySide6.QtCore import Property, QObject, QTimer, QUrl, Signal, Slot
 
-from ..recognition.net import CLASSES
+from ..recognition.classes import CLASSES
 from .session import Session
 
 THEME = {
@@ -57,6 +57,7 @@ class Backend(QObject):
         # not /tmp: MuseScore runs as a flatpak with a private /tmp and could not see it
         cache = Path.home() / ".cache" / "notocr"
         cache.mkdir(parents=True, exist_ok=True)
+        _clean_cache(cache)
         self._tmp = Path(tempfile.mkdtemp(prefix="session-", dir=cache))
         self._page = 0
         self._sel = -1
@@ -502,6 +503,15 @@ class Backend(QObject):
                 self.session.weights = Path(res["weights"])
 
         self._run("Retraining", job)
+
+
+def _clean_cache(cache: Path, keep: int = 5):
+    """Remove old session folders (page images, renders) but the newest few."""
+    import shutil
+
+    sessions = sorted(cache.glob("session-*"), key=lambda p: p.stat().st_mtime, reverse=True)
+    for old in sessions[keep:]:
+        shutil.rmtree(old, ignore_errors=True)
 
 
 def main(argv=None) -> int:

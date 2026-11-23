@@ -19,7 +19,7 @@ import cv2
 
 from ..model import Score
 from ..pipeline import Recognizer
-from ..recognition.net import CLASSES
+from ..recognition.classes import CLASSES
 from .generate import random_score
 
 

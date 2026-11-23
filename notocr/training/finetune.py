@@ -23,6 +23,11 @@ from ..paths import CORRECTIONS, USER_MODELS, active_model, synthetic_sets, synt
 
 
 def finetune(sessions=None, steps: int = 400, log=print, repeat: int = 30, val_limit: int = 8) -> dict:
+    try:
+        import torch  # noqa: F401
+    except ImportError as e:
+        raise RuntimeError("Retraining needs the developer install with PyTorch (uv sync in the repo); "
+                           "your corrections are saved and will be used then") from e
     for s in sessions or []:
         s.export_training(CORRECTIONS)
     index = CORRECTIONS / "index.json"

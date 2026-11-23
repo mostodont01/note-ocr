@@ -18,3 +18,9 @@ out/
 # your own test images (may be copyrighted engravings)
 Photos/
 dist-*.xpi
+build/
+
+# the shipped model (small) is part of the repo
+!models/
+models/*
+!models/detector.onnx
