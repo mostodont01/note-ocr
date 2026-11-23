@@ -64,20 +64,31 @@ Hook, Accidental, KeySig, Clef, TimeSig, Stem, Beam, BarLine, TieSegment, Tuplet
 NoteDot) in absolute coordinates; glyph subtypes come from outline signatures,
 calibrated automatically per music font (8 fonts).
 
-## Milestones
+## Milestones (status 2026-11-23)
 
-1. **Staff detection prototype** — clean scanned page → detected staves, debug images.
-2. **Score model + export** — hand-built score → MusicXML → `.mscz`, opens in MuseScore.
-3. **Synthetic data generator** — render MusicXML with MuseScore, extract symbol boxes.
-4. **Detector v1 + assembly** — first end-to-end result on printed single-staff parts.
-5. **Desktop app** — import, overlay, editor, correction logging, playback.
-6. **Retraining loop** — corrections + synthetic → fine-tune → new model version, compare.
-7. **Piano grand staff** — braces, two staves, multiple voices, cross-staff notes.
-8. **Drums** — percussion staff, notehead shapes, instrument mapping.
-9. **Phone photos** — dewarping + heavier augmentation.
-10. **Digital PDF fast path** — read music-font glyphs straight from vector PDFs.
-11. **Firefox extension** — box overlay → capture → send to the app (native messaging).
-12. **Packaging** — Linux AppImage, Windows `.exe`.
+1. ✅ **Staff detection** — run-length stats, deskew, banded detection for tilted staves.
+2. ✅ **Score model + export** — MusicXML, `.mscz` via MuseScore CLI, append to a file.
+3. ✅ **Synthetic data** — random scores, 8 music fonts, labels from MuseScore SVG.
+4. ✅ **Detector + assembly** — 96 % of notes fully right on synthetic validation pages.
+5. ✅ **Desktop app** — overlay, symbol edits, note overrides, playback, MuseScore render.
+6. ✅ **Retraining loop** — corrections → fine-tune → switch only if better.
+7. ✅ **Piano grand staff** — two-staff systems, shared barlines (one voice per staff).
+8. ✅ **Drums** — percussion clef, x noteheads, drum map, MusicXML unpitched.
+9. ✅ **Phone photos** — page detection, perspective, dewarp, lighting; photo-like training data.
+10. ✅ **PDF** — adaptive render DPI, SMuFL glyph fast path for notation-software PDFs.
+11. ✅ **Firefox extension** — selection box → native helper → app / quick save
+    (needs a one-time manual load in Firefox).
+12. ✅ **Packaging** — PyInstaller + ONNX Runtime; AppImage + Windows zip on `v*` tags.
+
+Also done: repeats, dynamics, articulations, fermatas, slurs (detector v3).
+
+### Next
+
+- Real-world test pages (scans, phone photos, PDFs from IMSLP) and fixing what they show.
+- Several voices on one staff (piano, choir); cross-staff notes.
+- Text: lyrics, chord symbols, tempo text, D.C./D.S./Coda, voltas (needs a text OCR).
+- Full multi-instrument scores (conductor's score) and transposing instruments.
+- Handwritten music (needs real training data, e.g. MUSCIMA++).
 
 ## Later (after v1)
 
